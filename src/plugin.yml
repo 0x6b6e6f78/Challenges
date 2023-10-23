@@ -1,0 +1,11 @@
+name: Challenges
+author: Corey
+version: 1.0.0
+api-version: 1.19
+main: de.corey.challenges.Main
+
+commands:
+  challenge:
+    aliases: []
+  info:
+    aliases: []

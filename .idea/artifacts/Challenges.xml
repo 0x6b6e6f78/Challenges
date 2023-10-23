@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="Challenges">
+    <output-path>$USER_HOME$/Desktop/Corey/server/plugins</output-path>
+    <root id="archive" name="Challenges.jar">
+      <element id="module-output" name="McChallenges" />
+    </root>
+  </artifact>
+</component>
