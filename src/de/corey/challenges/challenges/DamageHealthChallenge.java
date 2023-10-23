@@ -1,4 +1,4 @@
-package de.corey.challenges.listeners.challenges;
+package de.corey.challenges.challenges;
 
 import de.corey.challenges.model.Challenge;
 import de.corey.challenges.utils.Argument;
@@ -18,7 +18,7 @@ public class DamageHealthChallenge extends Challenge {
     private boolean hidePercentage;
 
     public DamageHealthChallenge() {
-        super("SchadenLeben", true, "Schaden = Leben");
+        super("SchadenLeben", "Schaden = Leben");
 
         timer = new Timer() {
             @Override
@@ -31,7 +31,7 @@ public class DamageHealthChallenge extends Challenge {
 
     @EventHandler
     public void onPlayerDamageEvent(EntityDamageByEntityEvent event) {
-        if (isSelected()) {
+        if (!isSelected()) {
             return;
         }
         if (event.getDamager() instanceof Player player) {

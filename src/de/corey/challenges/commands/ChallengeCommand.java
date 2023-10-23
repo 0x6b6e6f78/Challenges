@@ -65,7 +65,8 @@ public class ChallengeCommand extends ACommand {
                     return false;
                 }
                 String flags = String.join(" ", args).substring(optional.get().getName().length());
-                optional.get().start(flags.split(" "));
+                optional.get().readArguments(flags.split(" "));
+                optional.get().start();
                 return false;
             }
         }

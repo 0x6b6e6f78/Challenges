@@ -25,10 +25,20 @@ public abstract class Challenge implements Listener {
     @Getter
     private Map<String, Tuple<Field, Object>> arguments;
 
+    @Getter
     private String displayName;
 
-    public Challenge(String name, boolean enderDragonEnd) {
-        this.displayName = this.name = name;
+    public Challenge(String displayName) {
+        this(displayName.replaceAll("\\s+", ""), displayName, true);
+    }
+
+    public Challenge(String name, String displayName) {
+        this(name, displayName, true);
+    }
+
+    public Challenge(String name, String displayName, boolean enderDragonEnd) {
+        this.name = name;
+        this.displayName = displayName;
         this.enderDragonEnd = enderDragonEnd;
 
         new Thread(() -> {
@@ -41,15 +51,12 @@ public abstract class Challenge implements Listener {
         }).start();
     }
 
-    public Challenge(String name, boolean enderDragonEnd, String displayName) {
-        this(name, enderDragonEnd);
-        this.displayName = displayName;
-    }
-
-    public void start(String[] args) {
+    public void readArguments(String[] args) {
         resetArguments();
         readInputArguments(args);
+    }
 
+    public void start() {
         if (timer == null) {
             timer = new Timer();
         }
@@ -163,7 +170,7 @@ public abstract class Challenge implements Listener {
     }
 
     public boolean isSelected() {
-        return Main.getInstance().getSelectedChallenge() != this;
+        return Main.getInstance().getSelectedChallenge() == this;
     }
 
     public boolean isPaused() {

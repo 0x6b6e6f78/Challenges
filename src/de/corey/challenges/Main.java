@@ -3,8 +3,9 @@ package de.corey.challenges;
 import com.google.common.collect.Sets;
 import de.corey.challenges.commands.ChallengeCommand;
 import de.corey.challenges.commands.InfoCommand;
+import de.corey.challenges.challenges.EntityHitRandomEffectChallenge;
 import de.corey.challenges.model.Challenge;
-import de.corey.challenges.listeners.challenges.DamageHealthChallenge;
+import de.corey.challenges.challenges.DamageHealthChallenge;
 import de.corey.challenges.listeners.EnderDragonEndListener;
 import lombok.Getter;
 import lombok.Setter;
@@ -41,7 +42,7 @@ public class Main extends JavaPlugin {
     }
 
     public static Set<Challenge> allChallenges() {
-        return Sets.newHashSet(new DamageHealthChallenge());
+        return Sets.newHashSet(new DamageHealthChallenge(), new EntityHitRandomEffectChallenge());
     }
 
     public static void main(String[] args) {
