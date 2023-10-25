@@ -4,6 +4,7 @@ import de.corey.challenges.Main;
 import de.corey.challenges.model.Challenge;
 import de.corey.challenges.model.lists.PlayerStringList;
 import de.corey.challenges.utils.Argument;
+import de.corey.challenges.utils.Tuple;
 import net.minecraft.server.MinecraftServer;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -13,6 +14,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.player.PlayerMoveEvent;
 
 import java.lang.reflect.Field;
+import java.util.HashMap;
 
 public class SuperHotChallenge extends Challenge {
 
@@ -28,10 +30,11 @@ public class SuperHotChallenge extends Challenge {
 
     private Player determiner;
 
-    private int schedulerId, sleepSchedulerId = -1;
+    private int schedulerId = -1;
 
     private Thread thread;
 
+    private Map<Player, Tuple<Location, Long>> lastPlayerState = new HashMap<>();
     private Location lastLocation;
     private long nextLocationTime;
 
@@ -61,15 +64,15 @@ public class SuperHotChallenge extends Challenge {
                 }
             }
         })).start();
+
+        schedulerId = Bukkit.getScheduler().scheduleSyncRepeatingTask(Main.getInstance(), () -> {
+            System.out.println("tick");
+        }, 1, 1);
     }
 
     @Override
     public void stop() {
         super.stop();
-        if (sleepSchedulerId != -1) {
-            Bukkit.getScheduler().cancelTask(sleepSchedulerId);
-            sleepSchedulerId = -1;
-        }
         Bukkit.getScheduler().cancelTask(schedulerId);
         schedulerId = -1;
         onDisable();
@@ -102,29 +105,20 @@ public class SuperHotChallenge extends Challenge {
         }
     }
 
-    long lastServerNextTickTime = System.currentTimeMillis(), nextServerNextTickTime = lastServerNextTickTime, l;
-    public void addNextTickTime(int ticks) {
-        if (l != ticks) {
-            System.out.println(ticks);
-        }
-        l = ticks;
+    long newNextTickTime, l;
+    public void addNextTickTime(long millis) {
         try {
             Field nextTickTimeField = MinecraftServer.class.getDeclaredField("ah");
             nextTickTimeField.setAccessible(true);
             MinecraftServer server = ((CraftServer) Main.getInstance().getServer()).getServer();
 
             long serverNextTickTime = (long) nextTickTimeField.get(server);
-            long nowServerNextTickTime = serverNextTickTime + ticks;
-            if (nowServerNextTickTime < nextServerNextTickTime) {
-
+            if (serverNextTickTime > newNextTickTime) {
+                if (System.currentTimeMillis() > newNextTickTime) {
+                    newNextTickTime = millis;
+                }
+                nextTickTimeField.set(server, newNextTickTime);
             }
-
-            if () {
-                nextTickTimeField.set(server, nowServerNextTickTime);
-            } else if (serverNextTickTime != nextServerNextTickTime) {
-                nextTickTimeField.set(server, nextServerNextTickTime);
-            }
-            lastServerNextTickTime = serverNextTickTime;
         } catch (NoSuchFieldException | IllegalAccessException e) {
             throw new RuntimeException(e);
         }
@@ -143,7 +137,7 @@ public class SuperHotChallenge extends Challenge {
             return;
         }
         moving++;
-        Location currentLocation = determiner.getLocation();
+        Location currentLocation = determiner.getLocation(); // TODO: zu hashmap
         long currentLocationTime = System.currentTimeMillis();
         if (nextLocationTime < currentLocationTime) {
             nextLocationTime = currentLocationTime + 500;
