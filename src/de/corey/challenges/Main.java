@@ -1,6 +1,7 @@
 package de.corey.challenges;
 
 import com.google.common.collect.Sets;
+import de.corey.challenges.challenges.SuperHotChallenge;
 import de.corey.challenges.commands.ChallengeCommand;
 import de.corey.challenges.commands.InfoCommand;
 import de.corey.challenges.challenges.EntityHitRandomEffectChallenge;
@@ -31,6 +32,12 @@ public class Main extends JavaPlugin {
         register();
     }
 
+    @Override
+    public void onDisable() {
+        selectedChallenge = null;
+        challenges.forEach(Challenge::onDisable);
+    }
+
     public void register() {
         getServer().getPluginManager().registerEvents(new EnderDragonEndListener(), this);
 
@@ -42,7 +49,7 @@ public class Main extends JavaPlugin {
     }
 
     public static Set<Challenge> allChallenges() {
-        return Sets.newHashSet(new DamageHealthChallenge(), new EntityHitRandomEffectChallenge());
+        return Sets.newHashSet(new DamageHealthChallenge(), new EntityHitRandomEffectChallenge(), new SuperHotChallenge());
     }
 
     public static void main(String[] args) {

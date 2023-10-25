@@ -29,7 +29,7 @@ public abstract class Challenge implements Listener {
     private String displayName;
 
     public Challenge(String displayName) {
-        this(displayName.replaceAll("\\s+", ""), displayName, true);
+        this(displayName.replaceAll("\\W+", ""), displayName, true);
     }
 
     public Challenge(String name, String displayName) {
@@ -73,7 +73,11 @@ public abstract class Challenge implements Listener {
             }
             field.setAccessible(true);
             Object value = field.get(this);
-            arguments.put(field.getName(), new Tuple<>(field, value));
+            String label = field.getAnnotation(Argument.class).label();
+            if (label.equals("")) {
+                label = field.getName();
+            }
+            arguments.put(label, new Tuple<>(field, value));
         }
     }
 
@@ -160,6 +164,8 @@ public abstract class Challenge implements Listener {
         );
         Main.getInstance().setSelectedChallenge(null);
     }
+
+    public void onDisable() {}
 
     public String info() {
         return "§6" + displayName + " Challenge:\n";

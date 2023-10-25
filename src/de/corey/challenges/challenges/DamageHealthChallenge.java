@@ -18,7 +18,7 @@ public class DamageHealthChallenge extends Challenge {
     private boolean hidePercentage;
 
     public DamageHealthChallenge() {
-        super("SchadenLeben", "Schaden = Leben");
+        super("Schaden = Leben");
 
         timer = new Timer() {
             @Override

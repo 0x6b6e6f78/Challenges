@@ -108,10 +108,10 @@ public class EntityHitRandomEffectChallenge extends Challenge {
             if (livingEntity.hasPotionEffect(potionEffectType)) {
                 PotionEffect effect = Objects.requireNonNull(livingEntity.getPotionEffect(potionEffectType));
                 amplifier = Math.max((effect).getAmplifier(), amplifier);
-                livingEntity.removePotionEffect(potionEffectType);
                 if (durationStack) {
                     duration += effect.getDuration();
                 }
+                livingEntity.removePotionEffect(potionEffectType);
             }
             livingEntity.addPotionEffect(new PotionEffect(potionEffectType, duration, amplifier));
         }

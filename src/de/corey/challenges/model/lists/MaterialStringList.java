@@ -1,10 +1,12 @@
 package de.corey.challenges.model.lists;
 
+import lombok.NoArgsConstructor;
 import org.bukkit.Material;
 
 import java.util.Arrays;
 import java.util.stream.Stream;
 
+@NoArgsConstructor
 public class MaterialStringList extends StringList<Material> {
 
     public MaterialStringList(int limit) {

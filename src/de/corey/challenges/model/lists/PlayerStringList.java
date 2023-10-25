@@ -1,11 +1,17 @@
 package de.corey.challenges.model.lists;
 
+import lombok.NoArgsConstructor;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
 import java.util.stream.Stream;
 
+@NoArgsConstructor
 public class PlayerStringList extends StringList<Player> {
+
+    public PlayerStringList(int limit) {
+        super(limit);
+    }
 
     @Override
     public Stream<String> specification() {

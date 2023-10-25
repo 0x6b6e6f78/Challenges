@@ -114,7 +114,8 @@ public class ChallengeCommand extends ACommand {
                                 .filter(name -> !name.startsWith("$") && name.toLowerCase().contains(currentValue))
                                 .map(name -> arg[0] + "=" + name)
                                 .forEach(list::add);
-                    } else if (tuple.getT().getType().getSuperclass().equals(StringList.class)) { // StringList
+                    } else if (tuple.getT().getType().getSuperclass() != null &&
+                            tuple.getT().getType().getSuperclass().equals(StringList.class)) { // StringList
                         StringList<?> stringList = ((StringList<?>) tuple.getU());
                         String[] a = arg[1].split(",");
                         if (a.length > stringList.getLimit() || (arg[1].endsWith(",") && a.length == stringList.getLimit())) {
