@@ -12,6 +12,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.util.HashSet;
 import java.util.Set;
 
 @Getter
@@ -34,8 +35,10 @@ public class Main extends JavaPlugin {
 
     @Override
     public void onDisable() {
-        selectedChallenge = null;
-        challenges.forEach(Challenge::onDisable);
+        if (selectedChallenge != null) {
+            selectedChallenge.stop();
+            selectedChallenge = null;
+        }
     }
 
     public void register() {

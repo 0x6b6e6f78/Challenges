@@ -57,7 +57,7 @@ public class EntityHitRandomEffectChallenge extends Challenge {
 
     @EventHandler
     public void onDamage(EntityDamageEvent event) {
-        if (!isSelected()) {
+        if (!isActive()) {
             return;
         }
         if (event.getEntityType() != EntityType.PLAYER) {
@@ -74,7 +74,7 @@ public class EntityHitRandomEffectChallenge extends Challenge {
 
     @EventHandler
     public void onDamage(EntityDamageByEntityEvent event) {
-        if (!isSelected()) {
+        if (!isActive()) {
             return;
         }
         if (event.getEntityType() != EntityType.PLAYER) {

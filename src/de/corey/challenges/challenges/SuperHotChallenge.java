@@ -3,84 +3,122 @@ package de.corey.challenges.challenges;
 import de.corey.challenges.Main;
 import de.corey.challenges.model.Challenge;
 import de.corey.challenges.model.lists.PlayerStringList;
+import de.corey.challenges.model.superhot.LastPlayerState;
+import de.corey.challenges.model.superhot.MovingState;
 import de.corey.challenges.utils.Argument;
-import de.corey.challenges.utils.Tuple;
+import de.corey.challenges.utils.Timer;
 import net.minecraft.server.MinecraftServer;
 import org.bukkit.Bukkit;
-import org.bukkit.Location;
 import org.bukkit.craftbukkit.v1_20_R1.CraftServer;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.player.PlayerMoveEvent;
 
 import java.lang.reflect.Field;
-import java.util.HashMap;
+import java.util.*;
 
 public class SuperHotChallenge extends Challenge {
 
-    public static final int STILL_TICKS = 1;
-    public static final int WALK_TICKS = 20;
-    public static final int SPRINT_TICKS = 40;
-
     @Argument
-    private int multiplier = 1;
+    private boolean showTps;
 
     @Argument(label = "bestimmer")
     private PlayerStringList determinerList = new PlayerStringList(1);
 
-    private Player determiner;
+    //
 
-    private int schedulerId = -1;
+    private final List<LastPlayerState> determiners = new ArrayList<>();
 
-    private Thread thread;
+    private boolean running;
 
-    private Map<Player, Tuple<Location, Long>> lastPlayerState = new HashMap<>();
-    private Location lastLocation;
-    private long nextLocationTime;
+    private Field nextTickTimeField;
+    private MinecraftServer server;
 
-    private int moving;
-    private boolean checkMove;
+    private long nextTickTime, currentTickTime;
+    private MovingState movingState = MovingState.STAYING;
+    private long millisecondPerTick = 1000 / movingState.tps, lastMillisecondPerTick;
+
+    private long tickCount, now;
+    private double currentTps;
 
     public SuperHotChallenge() {
         super("Super Hot");
+
+        timer = new Timer() {
+            @Override
+            public String toText(Player player) {
+                return super.toText(player) + (showTps ? " §6" + currentTps + "tps" : "");
+            }
+        };
     }
 
     @Override
     public void start() {
         super.start();
+        running = true;
 
-        if ((determiner = determinerList.tStream().findAny().orElse(Bukkit.getOnlinePlayers().stream().findAny().orElse(null))) == null) {
+        if (!determineDeterminers()) {
             Bukkit.broadcastMessage("§cEs ist kein Spieler auf dem Server!");
             return;
         }
 
-        (thread = new Thread(() -> {
-            while (isSelected()) {
-                asyncTick();
-                try {
-                    Thread.sleep(50);
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-        })).start();
+        initReflection();
+        startLoopThread();
+        calculateAndSetTps();
+    }
 
-        schedulerId = Bukkit.getScheduler().scheduleSyncRepeatingTask(Main.getInstance(), () -> {
-            System.out.println("tick");
-        }, 1, 1);
+    public void initReflection() {
+        try {
+            nextTickTimeField = MinecraftServer.class.getDeclaredField("ah");
+            nextTickTimeField.setAccessible(true);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        server = ((CraftServer) Main.getInstance().getServer()).getServer();
+    }
+
+    public boolean determineDeterminers() {
+        if (Bukkit.getOnlinePlayers().isEmpty()) {
+            return false;
+        }
+
+        determinerList.tStream().findAny()
+                .ifPresentOrElse(player -> determiners.add(new LastPlayerState(player)), () ->
+                        Bukkit.getOnlinePlayers().stream()
+                                .map(LastPlayerState::new)
+                                .forEach(determiners::add));
+        return true;
+    }
+
+    public void startLoopThread() {
+        Thread thread = new Thread(() -> {
+            try {
+                while (isSelected() && running) {
+                    if (!isActive()) {
+                        Thread.sleep(1000);
+                        continue;
+                    }
+                    determineMovingState();
+                    Thread.sleep(5);
+                }
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+        thread.start();
     }
 
     @Override
     public void stop() {
+        running = false;
         super.stop();
-        Bukkit.getScheduler().cancelTask(schedulerId);
-        schedulerId = -1;
-        onDisable();
     }
+    
+    //
 
     @EventHandler
     public void onMove(PlayerMoveEvent event) {
-        if (!isSelected()) {
+        if (!isActive()) {
             return;
         }
         if (event.getTo() == null) {
@@ -89,79 +127,89 @@ public class SuperHotChallenge extends Challenge {
         if (event.getFrom().getWorld() != event.getTo().getWorld()) {
             return;
         }
-        if (event.getFrom().distance(event.getTo()) < .1) {
+        if (event.getFrom().distance(event.getTo()) < .01) {
             return;
         }
-        moving = 0;
-        double fallingSpeed;
-        if ((fallingSpeed = Math.max(0, event.getFrom().getY() - event.getTo().getY())) > 2.8) {
 
-        } else {
-            if (event.getPlayer().isSprinting()) {
-                //setTicks(-200);
-            } else if (!event.getPlayer().isSneaking()) {
-                //setTicks(-20);
-            }
-        }
+        double distance = event.getFrom().distance(event.getTo()) * 2;
+        double fallDistance = (event.getFrom().getY() - event.getTo().getY()) * 2;
+        determiners.stream()
+                .filter(lastPlayerState -> lastPlayerState.getPlayer() == event.getPlayer())
+                .forEach(lastPlayerState -> {
+                    lastPlayerState.setMovedDistance(distance);
+                    lastPlayerState.setFallDistance(fallDistance + lastPlayerState.getFallDistance());
+                });
     }
 
-    long newNextTickTime, l;
-    public void addNextTickTime(long millis) {
-        try {
-            Field nextTickTimeField = MinecraftServer.class.getDeclaredField("ah");
-            nextTickTimeField.setAccessible(true);
-            MinecraftServer server = ((CraftServer) Main.getInstance().getServer()).getServer();
+    //
 
-            long serverNextTickTime = (long) nextTickTimeField.get(server);
-            if (serverNextTickTime > newNextTickTime) {
-                if (System.currentTimeMillis() > newNextTickTime) {
-                    newNextTickTime = millis;
+    public void calculateAndSetTps() {
+        Bukkit.getScheduler().runTaskLater(Main.getInstance(), () -> {
+            if (showTps) {
+                long now = System.currentTimeMillis();
+                tickCount++;
+                if (this.now + 1000 < now) {
+                    currentTps = Math.round((tickCount / ((now - this.now) / 1000d)) * 1000) / 1000d;
+                    this.now = now;
+                    tickCount = 0;
                 }
-                nextTickTimeField.set(server, newNextTickTime);
             }
-        } catch (NoSuchFieldException | IllegalAccessException e) {
-            throw new RuntimeException(e);
+
+            try {
+                currentTickTime = nextTickTimeField.getLong(server) - 50;
+                nextTickTime = currentTickTime + (int) ((millisecondPerTick + millisecondPerTick + lastMillisecondPerTick) / 3);
+                nextTickTimeField.setLong(server, nextTickTime);
+                lastMillisecondPerTick = millisecondPerTick;
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+            if (isSelected()) {
+                calculateAndSetTps();
+            }
+        }, 1);
+    }
+
+    public void determineMovingState() throws Exception {
+        MovingState highestMovingState = MovingState.STAYING;
+        for (LastPlayerState lastPlayerState : determiners) {
+            if (lastPlayerState.getMovedDistance() == 0) {
+                continue;
+            }
+            lastPlayerState.setMovedDistance(Math.max(lastPlayerState.getMovedDistance() - .007, 0));
+            lastPlayerState.setFallDistance(Math.max(lastPlayerState.getFallDistance() - .2, 0));
+            if (lastPlayerState.getLastFallDistance() == lastPlayerState.getFallDistance()) {
+                lastPlayerState.setFallDistance(0);
+            }
+            lastPlayerState.setLastFallDistance(lastPlayerState.getFallDistance());
+
+            MovingState currentMovingState = getMovingState(lastPlayerState.getPlayer(), lastPlayerState.getFallDistance());
+            if (currentMovingState.tps > highestMovingState.tps) {
+                highestMovingState = currentMovingState;
+            }
+        }
+        setMovingState(highestMovingState);
+    }
+
+    //
+
+    public void setMovingState(MovingState movingState) throws Exception {
+        if (this.movingState != movingState) {
+            long tpsOffset = this.movingState.tps - movingState.tps;
+            long sptOffset = tpsOffset == 0 ? 0 : 1000 / tpsOffset;
+            this.movingState = movingState;
+            this.millisecondPerTick = 1000 / movingState.tps;
+            this.nextTickTimeField.set(server, currentTickTime + sptOffset);
         }
     }
 
-    @Override
-    public void onDisable() {
-        if (thread != null) {
-            thread.stop();
+    public MovingState getMovingState(Player player, double fallDistance) {
+        if (fallDistance > .4) {
+            return MovingState.FALLING;
+        } else if (player.isSneaking()) {
+            return MovingState.SNEAKING;
+        } else if (player.isSprinting()) {
+            return MovingState.SPRINTING;
         }
-    }
-
-    int allowedMoves = 10;
-    public void asyncTick() {
-        if (moving > allowedMoves) {
-            return;
-        }
-        moving++;
-        Location currentLocation = determiner.getLocation(); // TODO: zu hashmap
-        long currentLocationTime = System.currentTimeMillis();
-        if (nextLocationTime < currentLocationTime) {
-            nextLocationTime = currentLocationTime + 500;
-            if (lastLocation != null && checkMove) {
-                l(determiner, currentLocation);
-            }
-            lastLocation = currentLocation;
-        }
-
-        if (moving == allowedMoves) {
-            checkMove = false;
-            System.out.println("end moving");
-            // end
-        } else if (moving < allowedMoves) {
-            if (!checkMove) {
-                System.out.println("start moving");
-            }
-            checkMove = true;
-            System.out.println("moving");
-            addNextTickTime(300);
-        }
-    }
-
-    public void l(Player determiner, Location currentLocation) {
-        System.out.println(lastLocation.distance(currentLocation));
+        return MovingState.WALKING;
     }
 }

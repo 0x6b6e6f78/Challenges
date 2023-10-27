@@ -165,14 +165,16 @@ public abstract class Challenge implements Listener {
         Main.getInstance().setSelectedChallenge(null);
     }
 
-    public void onDisable() {}
-
     public String info() {
         return "§6" + displayName + " Challenge:\n";
     }
 
     public String infoNoColor() {
         return info().replaceAll("§.", "");
+    }
+
+    public boolean isActive() {
+        return isSelected() && !isPaused();
     }
 
     public boolean isSelected() {

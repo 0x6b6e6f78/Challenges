@@ -31,7 +31,7 @@ public class DamageHealthChallenge extends Challenge {
 
     @EventHandler
     public void onPlayerDamageEvent(EntityDamageByEntityEvent event) {
-        if (!isSelected()) {
+        if (!isActive()) {
             return;
         }
         if (event.getDamager() instanceof Player player) {

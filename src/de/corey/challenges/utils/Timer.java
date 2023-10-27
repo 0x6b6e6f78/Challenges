@@ -10,19 +10,27 @@ public class Timer {
 
     private long start, paused, pauseSum;
 
-    private int id;
+    private Thread thread;
 
     public void start() {
         start = System.currentTimeMillis();
-        id = Bukkit.getScheduler().scheduleSyncRepeatingTask(Main.getInstance(), () -> Bukkit.getOnlinePlayers().forEach(player -> {
-            String text;
-            if (paused == 0) {
-                text = toText(player);
-            } else {
-                text = "§8Timer ist pausiert";
+        thread = new Thread(() -> Bukkit.getOnlinePlayers().forEach(player -> {
+            try {
+                while (true) {
+                    String text;
+                    if (paused == 0) {
+                        text = toText(player);
+                    } else {
+                        text = "§8Timer ist pausiert";
+                    }
+                    player.spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText(text));
+                    Thread.sleep(1000);
+                }
+            } catch (Exception e) {
+                throw new RuntimeException(e);
             }
-            player.spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText(text));
-        }), 10, 10);
+        }));
+        thread.start();
     }
 
     public void pause() {
@@ -35,7 +43,7 @@ public class Timer {
     }
 
     public void stop() {
-        Bukkit.getScheduler().cancelTask(id);
+        thread.stop();
     }
 
     public String makePretty(long passedTime) {

@@ -1,5 +1,7 @@
 package de.corey.challenges.utils;
 
+import java.util.function.Consumer;
+
 public class Utils {
 
     private static String fill(boolean left, char filler, int length, String string) {

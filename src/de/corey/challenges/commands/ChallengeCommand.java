@@ -148,8 +148,16 @@ public class ChallengeCommand extends ACommand {
                 return list;
             }
         }
-        list = list.stream().filter(name -> name.toLowerCase().contains(args[args.length - 1].toLowerCase())).toList();
-
+        String lastArgument = args[args.length - 1].toLowerCase();
+        list = list.stream()
+                .filter(name -> name.toLowerCase().contains(lastArgument))
+                .sorted((str1, str2) -> {
+                    if (str1.toLowerCase().startsWith(lastArgument)) {
+                        return 1;
+                    }
+                    return str1.compareTo(str2);
+                })
+                .toList();
         return list;
     }
 }
