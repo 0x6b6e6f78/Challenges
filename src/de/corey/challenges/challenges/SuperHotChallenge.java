@@ -41,7 +41,7 @@ public class SuperHotChallenge extends Challenge {
 
     private long nextTickTime, currentTickTime;
     private MovingState movingState = MovingState.STAYING, lastMovingState = movingState;
-    private long millisecondPerTick = 1000 / movingState.tps, lastMillisecondPerTick;
+    private double millisecondPerTick = movingState.getMillisPerTick(), lastMillisecondPerTick;
 
     private long tickCount, now;
     private double currentTps;
@@ -213,7 +213,7 @@ public class SuperHotChallenge extends Challenge {
         if (this.movingState == movingState && movingState != this.lastMovingState) {
             long tpsOffset = this.lastMovingState.tps - movingState.tps;
             long sptOffset = tpsOffset == 0 ? 0 : 1000 / tpsOffset;
-            this.millisecondPerTick = 1000 / movingState.tps;
+            this.millisecondPerTick = movingState.getMillisPerTick();
             this.nextTickTimeField.setLong(server, currentTickTime + sptOffset);
             Bukkit.getWorlds().forEach(world -> world.setGameRule(GameRule.RANDOM_TICK_SPEED, movingState.rts));
             this.lastMovingState = movingState;

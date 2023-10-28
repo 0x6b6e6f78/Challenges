@@ -18,4 +18,8 @@ public enum MovingState {
     public MovingState getHighest(MovingState movingState) {
         return tps > movingState.tps ? this : movingState;
     }
+
+    public double getMillisPerTick() {
+        return 1000d / tps;
+    }
 }
