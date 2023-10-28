@@ -6,6 +6,7 @@ import org.bukkit.entity.*;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityPotionEffectEvent;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
@@ -21,11 +22,14 @@ public class EntityHitRandomEffectChallenge extends Challenge {
     @Argument
     private boolean durationStack;
 
+    private final Random random;
     private final Map<EntityDamageEvent.DamageCause, PotionEffectType> specification = new HashMap<>();
     private final Map<EntityType, PotionEffectType> entitySpecification = new HashMap<>();
+    private final Map<PotionEffectType, PotionEffectType> potionEffectSpecification = new HashMap<>();
 
     public EntityHitRandomEffectChallenge() {
         super("Random Effekt");
+        random = new Random();
     }
 
     @Override
@@ -41,7 +45,6 @@ public class EntityHitRandomEffectChallenge extends Challenge {
     }
 
     public void initSpecification() {
-        Random random = new Random();
         PotionEffectType[] potionEffectTypes = PotionEffectType.values();
         Arrays.stream(EntityDamageEvent.DamageCause.values())
                 .filter(cause -> cause != EntityDamageEvent.DamageCause.ENTITY_ATTACK)
@@ -52,6 +55,10 @@ public class EntityHitRandomEffectChallenge extends Challenge {
         Arrays.stream(EntityType.values()).filter(EntityType::isAlive).forEach(entityType -> {
             int rnd = random.nextInt(potionEffectTypes.length - 1);
             entitySpecification.put(entityType, potionEffectTypes[rnd]);
+        });
+        Arrays.stream(PotionEffectType.values()).forEach(potionEffectType -> {
+            int rnd = random.nextInt(potionEffectTypes.length - 1);
+            potionEffectSpecification.put(potionEffectType, potionEffectTypes[rnd]);
         });
     }
 
@@ -90,9 +97,32 @@ public class EntityHitRandomEffectChallenge extends Challenge {
         apply(event.getEntity(), entitySpecification.get(entity.getType()), event.getDamage());
     }
 
+    @EventHandler
+    public void onPotionEffect(EntityPotionEffectEvent event) {
+        if (!isActive()) {
+            return;
+        }
+        if (event.getCause() == EntityPotionEffectEvent.Cause.PLUGIN) {
+            return;
+        }
+        if (event.getAction() != EntityPotionEffectEvent.Action.ADDED && event.getAction() != EntityPotionEffectEvent.Action.CHANGED) {
+            return;
+        }
+        PotionEffectType potionEffectType;
+        if (event.getNewEffect() == null) {
+            return;
+        }
+        potionEffectType = event.getNewEffect().getType();
+        if (!potionEffectSpecification.containsKey(potionEffectType)) {
+            return;
+        }
+        event.setCancelled(true);
+        apply(event.getEntity(), potionEffectSpecification.get(potionEffectType), random.nextInt(10));
+    }
+
     public int getDuration(double damage, PotionEffectType potionEffectType) {
         if (potionEffectType == PotionEffectType.HARM) {
-            return 10;
+            return 3;
         }
         if (randomDuration) {
             return (int) (Math.random() * MAX_RANDOM_DURATION * 20);

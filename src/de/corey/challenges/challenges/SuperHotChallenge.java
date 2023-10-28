@@ -14,6 +14,8 @@ import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.craftbukkit.v1_20_R1.CraftServer;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.player.PlayerToggleSneakEvent;
 
 import java.lang.reflect.Field;
 import java.util.*;
@@ -157,7 +159,7 @@ public class SuperHotChallenge extends Challenge {
     }
 
     public void determineMovingState() throws Exception {
-        MovingState highest = MovingState.STAYING;
+        MovingState highest = MovingState.SNEAK_STAYING;
         for (LastPlayerState lastPlayerState : determiners) {
             Location location = lastPlayerState.getPlayer().getLocation();
             if (lastPlayerState.getLocation() != null) {
@@ -187,14 +189,16 @@ public class SuperHotChallenge extends Challenge {
     }
 
     private MovingState getMovingState(double startFallY, double movingXZ, Player player) {
-        MovingState movingState = MovingState.STAYING;
+        MovingState movingState = player.isSneaking() ? MovingState.SNEAK_STAYING : MovingState.STAYING;
         if (startFallY < -2) {
             movingState = movingState.getHighest(MovingState.FALLING);
         } else if (startFallY > 0) {
             movingState = movingState.getHighest(MovingState.JUMPING);
         }
         if (movingXZ > 0) {
-            if (player.isSwimming()) {
+            if (player.isInsideVehicle()) {
+                movingState = movingState.getHighest(MovingState.DRIVING);
+            } else if (player.isSwimming()) {
                 movingState = movingState.getHighest(MovingState.SWIMMING);
             } else if (player.isSneaking()) {
                 movingState = movingState.getHighest(MovingState.SNEAKING);
@@ -207,7 +211,11 @@ public class SuperHotChallenge extends Challenge {
         return movingState;
     }
 
-    //
+    public double getDistanceXZ(Location from, Location to) {
+        double dx = to.getX() - from.getX();
+        double dz = to.getZ() - from.getZ();
+        return Math.sqrt(dx * dx + dz * dz);
+    }
 
     public void setMovingState(MovingState movingState) throws Exception {
         if (this.movingState == movingState && movingState != this.lastMovingState) {
@@ -223,9 +231,20 @@ public class SuperHotChallenge extends Challenge {
         }
     }
 
-    public double getDistanceXZ(Location from, Location to) {
-        double dx = to.getX() - from.getX();
-        double dz = to.getZ() - from.getZ();
-        return Math.sqrt(dx * dx + dz * dz);
+    //
+
+    @EventHandler
+    public void onLeaveVehicle(PlayerToggleSneakEvent event) {
+        if (!isActive()) {
+            return;
+        }
+        if (event.isSneaking() && event.getPlayer().isInsideVehicle()) {
+            try {
+                this.movingState = MovingState.WALKING;
+                setMovingState(MovingState.WALKING);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
     }
 }

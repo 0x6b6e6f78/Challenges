@@ -5,13 +5,16 @@ import lombok.AllArgsConstructor;
 
 @AllArgsConstructor
 public enum MovingState {
-    STAYING(1, 0),
-    SNEAKING(10, 1),
+    SNEAK_STAYING(1, 0),
+    STAYING(5, 1),
+    SNEAKING(10, 2),
     WALKING(20, 3),
     SWIMMING(50, 10),
     JUMPING(60, 15),
     SPRINTING(100, 30),
+    DRIVING(SPRINTING.tps, SPRINTING.rts),
     FALLING(SPRINTING.tps, SPRINTING.rts);
+
     public final int tps;
     public final int rts;
 
