@@ -9,10 +9,11 @@ import de.corey.challenges.utils.Argument;
 import de.corey.challenges.utils.Timer;
 import net.minecraft.server.MinecraftServer;
 import org.bukkit.Bukkit;
+import org.bukkit.GameRule;
+import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.craftbukkit.v1_20_R1.CraftServer;
 import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.player.PlayerMoveEvent;
 
 import java.lang.reflect.Field;
 import java.util.*;
@@ -22,20 +23,24 @@ public class SuperHotChallenge extends Challenge {
     @Argument
     private boolean showTps;
 
+    @Argument
+    private boolean debug;
+
     @Argument(label = "bestimmer")
     private PlayerStringList determinerList = new PlayerStringList(1);
 
     //
 
     private final List<LastPlayerState> determiners = new ArrayList<>();
+    private final Map<World, Integer> randomTickSpeeds = new HashMap<>();
 
     private boolean running;
 
-    private Field nextTickTimeField;
+    private Field nextTickTimeField, overLoadTimeField;
     private MinecraftServer server;
 
     private long nextTickTime, currentTickTime;
-    private MovingState movingState = MovingState.STAYING;
+    private MovingState movingState = MovingState.STAYING, lastMovingState = movingState;
     private long millisecondPerTick = 1000 / movingState.tps, lastMillisecondPerTick;
 
     private long tickCount, now;
@@ -47,7 +52,8 @@ public class SuperHotChallenge extends Challenge {
         timer = new Timer() {
             @Override
             public String toText(Player player) {
-                return super.toText(player) + (showTps ? " §6" + currentTps + "tps" : "");
+                return super.toText(player) + (showTps || debug ? " §6" + currentTps + "tps" : "")
+                        + (debug ? " §7" + movingState : "");
             }
         };
     }
@@ -57,10 +63,12 @@ public class SuperHotChallenge extends Challenge {
         super.start();
         running = true;
 
-        if (!determineDeterminers()) {
+        if (!initDeterminers()) {
             Bukkit.broadcastMessage("§cEs ist kein Spieler auf dem Server!");
             return;
         }
+
+        Bukkit.getWorlds().forEach(world -> randomTickSpeeds.put(world, world.getGameRuleValue(GameRule.RANDOM_TICK_SPEED)));
 
         initReflection();
         startLoopThread();
@@ -71,13 +79,15 @@ public class SuperHotChallenge extends Challenge {
         try {
             nextTickTimeField = MinecraftServer.class.getDeclaredField("ah");
             nextTickTimeField.setAccessible(true);
+            overLoadTimeField = MinecraftServer.class.getDeclaredField("ae");
+            overLoadTimeField.setAccessible(true);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
         server = ((CraftServer) Main.getInstance().getServer()).getServer();
     }
 
-    public boolean determineDeterminers() {
+    public boolean initDeterminers() {
         if (Bukkit.getOnlinePlayers().isEmpty()) {
             return false;
         }
@@ -99,7 +109,7 @@ public class SuperHotChallenge extends Challenge {
                         continue;
                     }
                     determineMovingState();
-                    Thread.sleep(5);
+                    Thread.sleep(50);
                 }
             } catch (Exception e) {
                 throw new RuntimeException(e);
@@ -111,41 +121,15 @@ public class SuperHotChallenge extends Challenge {
     @Override
     public void stop() {
         running = false;
+        randomTickSpeeds.forEach((world, randomTickSpeed) -> world.setGameRule(GameRule.RANDOM_TICK_SPEED, randomTickSpeed));
         super.stop();
-    }
-    
-    //
-
-    @EventHandler
-    public void onMove(PlayerMoveEvent event) {
-        if (!isActive()) {
-            return;
-        }
-        if (event.getTo() == null) {
-            return;
-        }
-        if (event.getFrom().getWorld() != event.getTo().getWorld()) {
-            return;
-        }
-        if (event.getFrom().distance(event.getTo()) < .01) {
-            return;
-        }
-
-        double distance = event.getFrom().distance(event.getTo()) * 2;
-        double fallDistance = (event.getFrom().getY() - event.getTo().getY()) * 2;
-        determiners.stream()
-                .filter(lastPlayerState -> lastPlayerState.getPlayer() == event.getPlayer())
-                .forEach(lastPlayerState -> {
-                    lastPlayerState.setMovedDistance(distance);
-                    lastPlayerState.setFallDistance(fallDistance + lastPlayerState.getFallDistance());
-                });
     }
 
     //
 
     public void calculateAndSetTps() {
         Bukkit.getScheduler().runTaskLater(Main.getInstance(), () -> {
-            if (showTps) {
+            if (showTps || debug) {
                 long now = System.currentTimeMillis();
                 tickCount++;
                 if (this.now + 1000 < now) {
@@ -155,13 +139,16 @@ public class SuperHotChallenge extends Challenge {
                 }
             }
 
-            try {
-                currentTickTime = nextTickTimeField.getLong(server) - 50;
-                nextTickTime = currentTickTime + (int) ((millisecondPerTick + millisecondPerTick + lastMillisecondPerTick) / 3);
-                nextTickTimeField.setLong(server, nextTickTime);
-                lastMillisecondPerTick = millisecondPerTick;
-            } catch (Exception e) {
-                throw new RuntimeException(e);
+            if (isActive()) {
+                try {
+                    currentTickTime = nextTickTimeField.getLong(server) - 50;
+                    nextTickTime = currentTickTime + (int) ((millisecondPerTick + millisecondPerTick + lastMillisecondPerTick) / 3);
+                    nextTickTimeField.setLong(server, nextTickTime);
+                    overLoadTimeField.set(server, nextTickTime);
+                    lastMillisecondPerTick = millisecondPerTick;
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
             }
             if (isSelected()) {
                 calculateAndSetTps();
@@ -170,46 +157,75 @@ public class SuperHotChallenge extends Challenge {
     }
 
     public void determineMovingState() throws Exception {
-        MovingState highestMovingState = MovingState.STAYING;
+        MovingState highest = MovingState.STAYING;
         for (LastPlayerState lastPlayerState : determiners) {
-            if (lastPlayerState.getMovedDistance() == 0) {
-                continue;
+            Location location = lastPlayerState.getPlayer().getLocation();
+            if (lastPlayerState.getLocation() != null) {
+                MovingState movingState = toMovingState(lastPlayerState);
+                if (movingState.tps > highest.tps) {
+                    highest = movingState;
+                }
             }
-            lastPlayerState.setMovedDistance(Math.max(lastPlayerState.getMovedDistance() - .007, 0));
-            lastPlayerState.setFallDistance(Math.max(lastPlayerState.getFallDistance() - .2, 0));
-            if (lastPlayerState.getLastFallDistance() == lastPlayerState.getFallDistance()) {
-                lastPlayerState.setFallDistance(0);
-            }
-            lastPlayerState.setLastFallDistance(lastPlayerState.getFallDistance());
+            lastPlayerState.setLocation(location);
+        }
+        setMovingState(highest);
+    }
 
-            MovingState currentMovingState = getMovingState(lastPlayerState.getPlayer(), lastPlayerState.getFallDistance());
-            if (currentMovingState.tps > highestMovingState.tps) {
-                highestMovingState = currentMovingState;
+    public MovingState toMovingState(LastPlayerState lastPlayerState) {
+        Location from = lastPlayerState.getLocation();
+        Player player = lastPlayerState.getPlayer();
+        Location to = player.getLocation();
+        double movingXZ = getDistanceXZ(from, to);
+        double movingY = to.getY() - from.getY();
+        double startFallY = lastPlayerState.getStartFallY();
+        if (movingY == 0) {
+            lastPlayerState.setStartFallY(0);
+        } else {
+            lastPlayerState.setStartFallY(startFallY + movingY);
+        }
+        return getMovingState(startFallY, movingXZ, player);
+    }
+
+    private MovingState getMovingState(double startFallY, double movingXZ, Player player) {
+        MovingState movingState = MovingState.STAYING;
+        if (startFallY < -2) {
+            movingState = movingState.getHighest(MovingState.FALLING);
+        } else if (startFallY > 0) {
+            movingState = movingState.getHighest(MovingState.JUMPING);
+        }
+        if (movingXZ > 0) {
+            if (player.isSwimming()) {
+                movingState = movingState.getHighest(MovingState.SWIMMING);
+            } else if (player.isSneaking()) {
+                movingState = movingState.getHighest(MovingState.SNEAKING);
+            } else if (player.isSprinting()) {
+                movingState = movingState.getHighest(MovingState.SPRINTING);
+            } else {
+                movingState = movingState.getHighest(MovingState.WALKING);
             }
         }
-        setMovingState(highestMovingState);
+        return movingState;
     }
 
     //
 
     public void setMovingState(MovingState movingState) throws Exception {
-        if (this.movingState != movingState) {
-            long tpsOffset = this.movingState.tps - movingState.tps;
+        if (this.movingState == movingState && movingState != this.lastMovingState) {
+            long tpsOffset = this.lastMovingState.tps - movingState.tps;
             long sptOffset = tpsOffset == 0 ? 0 : 1000 / tpsOffset;
-            this.movingState = movingState;
             this.millisecondPerTick = 1000 / movingState.tps;
-            this.nextTickTimeField.set(server, currentTickTime + sptOffset);
+            this.nextTickTimeField.setLong(server, currentTickTime + sptOffset);
+            Bukkit.getWorlds().forEach(world -> world.setGameRule(GameRule.RANDOM_TICK_SPEED, movingState.rts));
+            this.lastMovingState = movingState;
+        }
+        if (this.movingState != movingState) {
+            this.movingState = movingState;
         }
     }
 
-    public MovingState getMovingState(Player player, double fallDistance) {
-        if (fallDistance > .4) {
-            return MovingState.FALLING;
-        } else if (player.isSneaking()) {
-            return MovingState.SNEAKING;
-        } else if (player.isSprinting()) {
-            return MovingState.SPRINTING;
-        }
-        return MovingState.WALKING;
+    public double getDistanceXZ(Location from, Location to) {
+        double dx = to.getX() - from.getX();
+        double dz = to.getZ() - from.getZ();
+        return Math.sqrt(dx * dx + dz * dz);
     }
 }

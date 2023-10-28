@@ -74,7 +74,7 @@ public abstract class Challenge implements Listener {
             field.setAccessible(true);
             Object value = field.get(this);
             String label = field.getAnnotation(Argument.class).label();
-            if (label.equals("")) {
+            if (label.isEmpty()) {
                 label = field.getName();
             }
             arguments.put(label, new Tuple<>(field, value));
