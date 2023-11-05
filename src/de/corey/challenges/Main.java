@@ -1,15 +1,14 @@
 package de.corey.challenges;
 
 import com.google.common.collect.Sets;
-import de.corey.challenges.challenges.SuperHotChallenge;
+import de.corey.challenges.challenges.*;
 import de.corey.challenges.commands.ChallengeCommand;
 import de.corey.challenges.commands.InfoCommand;
-import de.corey.challenges.challenges.EntityHitRandomEffectChallenge;
 import de.corey.challenges.model.Challenge;
-import de.corey.challenges.challenges.DamageHealthChallenge;
 import de.corey.challenges.listeners.EnderDragonEndListener;
 import lombok.Getter;
 import lombok.Setter;
+import org.bukkit.craftbukkit.v1_20_R1.inventory.CraftItemFactory;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.HashSet;
@@ -52,7 +51,8 @@ public class Main extends JavaPlugin {
     }
 
     public static Set<Challenge> allChallenges() {
-        return Sets.newHashSet(new DamageHealthChallenge(), new EntityHitRandomEffectChallenge(), new SuperHotChallenge());
+        return Sets.newHashSet(new DamageHealthChallenge(), new EntityHitRandomEffectChallenge(), new SuperHotChallenge(),
+                new NearByChallenge(), new InvSlotChallenge());
     }
 
     public static void main(String[] args) {
