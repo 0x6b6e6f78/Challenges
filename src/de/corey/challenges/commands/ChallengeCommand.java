@@ -3,6 +3,7 @@ package de.corey.challenges.commands;
 import de.corey.challenges.Main;
 import de.corey.challenges.model.Challenge;
 import de.corey.challenges.model.lists.StringList;
+import de.corey.challenges.utils.Argument;
 import de.corey.challenges.utils.Tuple;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
@@ -138,6 +139,7 @@ public class ChallengeCommand extends ACommand {
                     }
                 } else {
                     optional.get().getArguments().entrySet().stream()
+                            .filter(argument -> !argument.getValue().getT().getAnnotation(Argument.class).hidden())
                             .filter(argument -> argument.getKey().toLowerCase().contains(lastArgument.toLowerCase()) &&
                                     Arrays.stream(args)
                                             .map(arg -> arg.split("=")[0])

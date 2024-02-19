@@ -7,4 +7,5 @@ import java.lang.annotation.RetentionPolicy;
 public @interface Argument {
 
     String label() default "";
+    boolean hidden() default false;
 }
